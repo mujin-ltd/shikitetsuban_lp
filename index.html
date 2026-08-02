@@ -23,6 +23,8 @@
     --pc-navy-ink: #eef1f5;
     --pc-red: #b23a2e;
     --pc-red-dark: #7f2a21;
+    --pc-yellow: #ffe45f;      /* ロゴの黄色 */
+    --pc-yellow-dark: #f0cf34;
     --pc-steel-1: #22262a;
     --pc-steel-2: #464d53;
     --pc-steel-ink: #eee9df;
@@ -241,6 +243,12 @@
     color: #fff;
     box-shadow: 0 10px 22px -8px rgba(178,58,46,0.7);
   }
+  .btn--accent {
+    background: var(--pc-yellow);
+    color: var(--pc-ink);
+    box-shadow: 0 10px 22px -8px rgba(255, 228, 95, 0.55);
+  }
+  .btn--accent:hover { background: var(--pc-yellow-dark); }
   .btn--ghost {
     background: transparent;
     color: var(--pc-steel-ink);
@@ -498,7 +506,7 @@
     </div>
 
     <div class="fv-ctas">
-      <a class="btn btn--primary" href="#contact-form">資料請求・お問い合わせはこちら</a>
+      <a class="btn btn--accent" href="#contact-form">資料請求・お問い合わせはこちら</a>
       <a class="btn btn--primary" href="tel:053-485-4126">電話で相談する（053-485-4126）</a>
     </div>
   </div>
