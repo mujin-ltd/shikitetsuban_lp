@@ -682,11 +682,16 @@
     function onGesture(e) {
       // 操作ボタン自身の操作はユーザーの明示的な選択に任せる
       if (e.target && e.target.closest && e.target.closest('.video-controls')) return;
-      // 自動再生が保留されたまま止まっていたら、この操作を機に再生する
-      if (video.paused && !userTouchedPlay) play();
-      if (userTouchedSound) { disarm(); return; }
       disarm();
-      tryAutoSound();
+      if (userTouchedSound) return;
+      if (video.paused && !userTouchedPlay) {
+        // 再生復帰と音ONを同時にやると両方まとめて弾かれる。
+        // まずミュートのまま再生を戻し、落ち着いてから音を入れる。
+        play();
+        setTimeout(tryAutoSound, 500);
+      } else {
+        tryAutoSound();
+      }
     }
     function disarm() {
       gestureArmed = false;
