@@ -670,7 +670,13 @@
     armUnmuteOnFirstGesture();
   });
   video.addEventListener('volumechange', syncSoundBtn);
-  video.addEventListener('timeupdate', syncButtons); // 表示ズレの保険
+  var steadyTicks = 0;
+  video.addEventListener('timeupdate', function () {
+    syncButtons(); // 表示ズレの保険
+    // しばらく問題なく再生できたら、再開の試行枠を戻す
+    if (video.paused) { steadyTicks = 0; return; }
+    if (++steadyTicks > 20) { steadyTicks = 0; autoResumes = 0; }
+  });
 
   // ページ内で最初に何か触れた瞬間に音を入れる（＝音声デフォルトONに最も近い挙動）
   function armUnmuteOnFirstGesture() {
