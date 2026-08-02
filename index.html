@@ -611,8 +611,9 @@
 
   var userTouchedSound = false; // ユーザーが音声ボタンを操作した
   var userTouchedPlay = false;  // ユーザーが再生/一時停止ボタンを操作した
+  var soundConfirmed = false;   // 音ありが実際に継続できたか
   var autoSoundTries = 0;       // 自動で音ありにした回数
-  var MAX_AUTO_SOUND_TRIES = 3; // これを超えたら諦めてミュート再生を維持する
+  var MAX_AUTO_SOUND_TRIES = 6; // これを超えたら諦めてミュート再生を維持する
   var autoResumes = 0;          // 勝手に止められて再開した回数
   var MAX_AUTO_RESUMES = 8;     // 暴走防止の上限
   var gestureArmed = false;
@@ -642,12 +643,18 @@
     if (p && typeof p.catch === 'function') p.catch(function () {});
   }
 
-  // 音ありに切り替える（自動再生ポリシーに弾かれる前提の試行）
+  // 音ありに切り替える。効いたか確かめ、ダメなら次の操作を待ち受け直す。
   function tryAutoSound() {
-    if (userTouchedSound || autoSoundTries >= MAX_AUTO_SOUND_TRIES) return;
+    if (userTouchedSound || soundConfirmed) return;
+    if (autoSoundTries >= MAX_AUTO_SOUND_TRIES) return;
     autoSoundTries++;
     video.muted = false;
     syncSoundBtn();
+    setTimeout(function () {
+      if (userTouchedSound) return;
+      if (!video.muted && !video.paused) { soundConfirmed = true; return; }
+      armUnmuteOnFirstGesture();
+    }, 900);
   }
 
   video.addEventListener('play', syncPlayBtn);
@@ -658,26 +665,28 @@
     if (userTouchedPlay || video.ended) return;
     if (autoResumes >= MAX_AUTO_RESUMES) return;
     autoResumes++;
-    if (!video.muted) { video.muted = true; syncSoundBtn(); }
+    if (!video.muted) { video.muted = true; syncSoundBtn(); soundConfirmed = false; }
     play();
-    if (autoSoundTries < MAX_AUTO_SOUND_TRIES) armUnmuteOnFirstGesture();
+    armUnmuteOnFirstGesture();
   });
   video.addEventListener('volumechange', syncSoundBtn);
   video.addEventListener('timeupdate', syncButtons); // 表示ズレの保険
 
   // ページ内で最初に何か触れた瞬間に音を入れる（＝音声デフォルトONに最も近い挙動）
   function armUnmuteOnFirstGesture() {
-    if (gestureArmed) return;
+    if (gestureArmed || userTouchedSound || soundConfirmed) return;
     gestureArmed = true;
-    var events = ['pointerdown', 'pointerup', 'click', 'touchstart', 'touchend', 'keydown', 'wheel'];
+    // ブラウザが「ユーザー操作」と認めるイベントだけを対象にする。
+    // wheel や touchstart は操作として扱われず、音ありにしても弾かれる。
+    var events = ['pointerdown', 'pointerup', 'click', 'touchend', 'keydown'];
     function onGesture(e) {
       // 操作ボタン自身の操作はユーザーの明示的な選択に任せる
       if (e.target && e.target.closest && e.target.closest('.video-controls')) return;
       // 自動再生が保留されたまま止まっていたら、この操作を機に再生する
       if (video.paused && !userTouchedPlay) play();
       if (userTouchedSound) { disarm(); return; }
-      tryAutoSound();
       disarm();
+      tryAutoSound();
     }
     function disarm() {
       gestureArmed = false;
