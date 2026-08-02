@@ -506,7 +506,6 @@
     </div>
 
     <div class="fv-ctas">
-      <a class="btn btn--accent" href="#contact-form">資料請求・お問い合わせはこちら</a>
       <a class="btn btn--primary" href="tel:053-485-4126">電話で相談する（053-485-4126）</a>
     </div>
   </div>
@@ -614,7 +613,7 @@
   var userTouchedPlay = false;  // ユーザーが再生/一時停止ボタンを操作した
   var autoSound = false;        // こちらの判断で音ありにしている状態か
   var autoSoundTries = 0;       // 自動で音ありにした回数
-  var MAX_AUTO_SOUND_TRIES = 2; // これを超えたら諦めてミュート再生を維持する
+  var MAX_AUTO_SOUND_TRIES = 3; // これを超えたら諦めてミュート再生を維持する
   var gestureArmed = false;
 
   // ブラウザ側が勝手にミュートを戻すことがあるため、表示は常に実状態から作る
@@ -671,7 +670,7 @@
   function armUnmuteOnFirstGesture() {
     if (gestureArmed) return;
     gestureArmed = true;
-    var events = ['pointerdown', 'touchstart', 'keydown', 'wheel'];
+    var events = ['pointerdown', 'pointerup', 'click', 'touchstart', 'touchend', 'keydown', 'wheel'];
     function onGesture(e) {
       if (userTouchedSound) { disarm(); return; }
       // 音声ボタン自身の操作はユーザーの明示的な選択に任せる
@@ -693,6 +692,8 @@
     Promise.resolve(p).then(function () {
       syncPlayBtn();
       tryAutoSound();
+      // ブラウザに差し戻される前にユーザーが触った場合も拾えるようにしておく
+      armUnmuteOnFirstGesture();
     }, function () {
       // 省電力モード等でミュートでも弾かれた場合はボタンから再生してもらう
       syncPlayBtn();
