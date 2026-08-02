@@ -611,9 +611,10 @@
 
   var userTouchedSound = false; // ユーザーが音声ボタンを操作した
   var userTouchedPlay = false;  // ユーザーが再生/一時停止ボタンを操作した
-  var autoSound = false;        // こちらの判断で音ありにしている状態か
   var autoSoundTries = 0;       // 自動で音ありにした回数
   var MAX_AUTO_SOUND_TRIES = 3; // これを超えたら諦めてミュート再生を維持する
+  var autoResumes = 0;          // 勝手に止められて再開した回数
+  var MAX_AUTO_RESUMES = 8;     // 暴走防止の上限
   var gestureArmed = false;
 
   // ブラウザ側が勝手にミュートを戻すことがあるため、表示は常に実状態から作る
@@ -636,32 +637,30 @@
   }
   function syncButtons() { syncSoundBtn(); syncPlayBtn(); }
 
+  function play() {
+    var p = video.play();
+    if (p && typeof p.catch === 'function') p.catch(function () {});
+  }
+
   // 音ありに切り替える（自動再生ポリシーに弾かれる前提の試行）
   function tryAutoSound() {
     if (userTouchedSound || autoSoundTries >= MAX_AUTO_SOUND_TRIES) return;
     autoSoundTries++;
-    autoSound = true;
     video.muted = false;
     syncSoundBtn();
   }
 
-  // 音ありをブラウザに差し戻されたとき、ミュート再生へ自動復帰する
-  function fallbackToMuted() {
-    autoSound = false;
-    video.muted = true;
-    syncSoundBtn();
-    if (video.paused) {
-      var p = video.play();
-      if (p && typeof p.catch === 'function') p.catch(function () {});
-    }
-    if (autoSoundTries < MAX_AUTO_SOUND_TRIES) armUnmuteOnFirstGesture();
-  }
-
   video.addEventListener('play', syncPlayBtn);
+  // ユーザーが止めたのでない停止＝自動再生ポリシーによる差し戻し。
+  // 音を捨ててでも再生を止めないことを優先し、ミュートして再開する。
   video.addEventListener('pause', function () {
     syncPlayBtn();
-    // 自動で音ありにした直後の停止＝自動再生ポリシーによる差し戻し
-    if (autoSound && !userTouchedSound && !userTouchedPlay) fallbackToMuted();
+    if (userTouchedPlay || video.ended) return;
+    if (autoResumes >= MAX_AUTO_RESUMES) return;
+    autoResumes++;
+    if (!video.muted) { video.muted = true; syncSoundBtn(); }
+    play();
+    if (autoSoundTries < MAX_AUTO_SOUND_TRIES) armUnmuteOnFirstGesture();
   });
   video.addEventListener('volumechange', syncSoundBtn);
   video.addEventListener('timeupdate', syncButtons); // 表示ズレの保険
@@ -672,9 +671,11 @@
     gestureArmed = true;
     var events = ['pointerdown', 'pointerup', 'click', 'touchstart', 'touchend', 'keydown', 'wheel'];
     function onGesture(e) {
-      if (userTouchedSound) { disarm(); return; }
-      // 音声ボタン自身の操作はユーザーの明示的な選択に任せる
+      // 操作ボタン自身の操作はユーザーの明示的な選択に任せる
       if (e.target && e.target.closest && e.target.closest('.video-controls')) return;
+      // 自動再生が保留されたまま止まっていたら、この操作を機に再生する
+      if (video.paused && !userTouchedPlay) play();
+      if (userTouchedSound) { disarm(); return; }
       tryAutoSound();
       disarm();
     }
@@ -687,9 +688,8 @@
 
   // まずミュートで確実に再生させ、そのうえで音ありに切り替えを試みる
   function start() {
-    video.muted = true;
-    var p = video.play();
-    Promise.resolve(p).then(function () {
+    if (!userTouchedSound) video.muted = true;
+    Promise.resolve(video.play()).then(function () {
       syncPlayBtn();
       tryAutoSound();
       // ブラウザに差し戻される前にユーザーが触った場合も拾えるようにしておく
@@ -702,17 +702,24 @@
   }
   start();
 
+  // 非表示タブで読み込まれた場合、自動再生は保留される。表示された時点で開始する
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    autoResumes = 0; // 戻ってきたら再開の試行枠をリセット
+    if (userTouchedPlay || !video.paused) return;
+    start();
+  });
+
   playBtn.addEventListener('click', function () {
     userTouchedPlay = true;
-    if (video.paused) { video.play(); } else { video.pause(); }
+    if (video.paused) { play(); } else { video.pause(); }
   });
 
   soundBtn.addEventListener('click', function () {
     userTouchedSound = true;
-    autoSound = false;
     video.muted = !video.muted;
     syncSoundBtn();
-    if (!video.muted && video.paused) video.play();
+    if (!video.muted && video.paused) play();
   });
 })();
 </script>
